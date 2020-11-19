@@ -1,4 +1,4 @@
-const gulp = require('gulp');
+const { src, dest, series, watch } = require('gulp');
 const rename = require('gulp-rename');
 const notify = require('gulp-notify');
 const replace = require('gulp-replace-task');
@@ -14,19 +14,22 @@ if (ENV === 'extension') {
     filesArr.push('./src/manifest.json', './src/icons/**/*');
 }
 
-gulp.task('copy-files', function () {
-    gulp.src(filesArr, { base: './src' }).pipe(gulp.dest(distPath)).pipe(notify({
-      message: 'Done!',
-      onLast: true
-    }));
-});
+function copyFiles() {
+    return src(filesArr, { base: './src' })
+        .pipe(dest(distPath))
+        .pipe(notify({
+            message: 'Done!',
+            onLast: true
+        }));
+}
 
-gulp.task('copy-favicons', function () {
-    gulp.src('./src/favicons/*').pipe(gulp.dest(distPath));
-});
+function copyFavicons() {
+    return src('./src/favicons/*')
+        .pipe(dest(distPath));
+}
 
-gulp.task('preprocess', function () {
-    gulp.src('./src/index.html')
+function preprocess() {
+    return src('./src/index.html')
         .pipe(replace({
             patterns: [
                 {
@@ -66,32 +69,38 @@ gulp.task('preprocess', function () {
                 }
             ]
         }))
-        .pipe(gulp.dest(distPath));
-});
-
-gulp.task('set-env', function () {
-    gulp.src(`./src/env/${ENV}.env.js`)
-        .pipe(rename('env.js'))
-        .pipe(gulp.dest(`${distPath}/env/`));
-});
-
-// Copy NPM dependencies
-gulp.task('copy-npm-dependencies', function() {
-    gulp.src([
-        'node_modules/axios/dist/axios.min.js',
-        'node_modules/chart.js/dist/Chart.min.js',
-        'node_modules/moment/min/moment.min.js',
-        'node_modules/super-repo/lib/index.js'
-    ]).pipe(gulp.dest(`${distPath}/lib/`));
-});
-
-const buildTasks = ['copy-files', 'preprocess', 'copy-npm-dependencies', 'set-env'];
-if (ENV === 'website') {
-    buildTasks.push('copy-favicons');
+        .pipe(dest(distPath));
 }
 
-gulp.task('build', buildTasks);
+function setEnv() {
+    return src(`./src/env/${ENV}.env.js`)
+        .pipe(rename('env.js'))
+        .pipe(dest(`${distPath}/env/`));
+}
 
-gulp.task('build:watch', function () {
-    gulp.watch('./src/**/*', ['copy-files', 'preprocess']);
-});
+// Copy NPM dependencies
+function copyNpmDependencies() {
+    return src(
+        [
+            'node_modules/axios/dist/axios.min.js',
+            'node_modules/chart.js/dist/Chart.min.js',
+            'node_modules/moment/min/moment.min.js',
+            'node_modules/super-repo/lib/index.js'
+        ])
+        .pipe(dest(`${distPath}/lib/`));
+}
+
+const buildTasks = [copyFiles, preprocess, copyNpmDependencies, setEnv];
+if (ENV === 'website') {
+    buildTasks.push(copyFavicons);
+}
+
+const build = series(...buildTasks)
+
+function buildWatch() {
+    return watch(['./src/**/*'], series(copyFiles, preprocess));
+}
+
+exports.watch = buildWatch
+exports.build = build
+exports.default = build
